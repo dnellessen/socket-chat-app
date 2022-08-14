@@ -10,8 +10,8 @@ public class Server {
     private BufferedReader in;
 
     public void start(int port) throws IOException {
-        System.out.println("[Server] Create socket on port :: " + port);
         serverSocket = new ServerSocket(port);
+        System.out.println("[Server] Created socket on port :: " + port);
 
         System.out.println("[Server] Listening for connection...");
         clientSocket = serverSocket.accept();
@@ -19,18 +19,25 @@ public class Server {
 
         out = new PrintWriter(clientSocket.getOutputStream(), true);
         in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-        
-        String clientMessage = in.readLine();
-        System.out.println("[Server] Recieved message :: " + clientMessage);
-        
+    }
+    
+    public void run() throws IOException {
+        String clientMessage;
         String serverResponse;
-        
-        if (clientMessage.equals("hello server"))
-        serverResponse = "hello client";
-        else serverResponse = "invalid message, but hello";
-        
-        out.println(serverResponse);
-        System.out.println("[Server] Sent message :: " + serverResponse);
+
+        while (true) {
+            clientMessage = in.readLine();
+            System.out.println("[Server] Recieved message :: " + clientMessage);
+
+            if (clientMessage.equals("exit")) {
+                System.out.println("[Server] User disconnected");
+                break;
+            }
+
+            serverResponse = "You said '" + clientMessage + "'";
+            out.println(serverResponse);
+            System.out.println("[Server] Sent message :: " + serverResponse);
+        }
     }
     
     public void stop() throws IOException {
@@ -44,6 +51,7 @@ public class Server {
     public static void main(String[] args) throws IOException {
         Server server = new Server();
         server.start(8000);
+        server.run();
         server.stop();
     }
 }

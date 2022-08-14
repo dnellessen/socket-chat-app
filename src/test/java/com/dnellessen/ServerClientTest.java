@@ -1,8 +1,8 @@
 package com.dnellessen;
 
-import static org.junit.Assert.assertEquals;
-
 import java.io.IOException;
+
+import static org.junit.Assert.assertEquals;
 
 import org.junit.After;
 import org.junit.Before;
@@ -18,15 +18,9 @@ public class ServerClientTest {
     }
 
     @Test
-    public void whenClientSendsExistingMessage_expectSpecificResponse() throws IOException{
-        String response = client.sendMessage("hello server");
-        assertEquals("hello client", response);
-    }
-
-    @Test
-    public void whenClientSendsNonExistingMessage_expectDefaultResponse() throws IOException{
-        String response = client.sendMessage("salve");
-        assertEquals("invalid message, but hello", response);
+    public void whenClientSendsMessage_expectEchoResponse() throws IOException{
+        String response = client.sendMessage("hello server", true);
+        assertEquals("You said 'hello server'", response);
     }
 
     @After
