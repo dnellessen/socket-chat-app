@@ -12,7 +12,7 @@ public class Client {
     public void start(String host, int port) throws IOException {
         clientSocket = new Socket(host, port);
         System.out.println("[Client] Created stream socket on port :: " + port);
-
+        
         out = new PrintWriter(clientSocket.getOutputStream(), true);
         in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
     }
@@ -52,7 +52,7 @@ public class Client {
 
     }
     
-    public void stop() throws IOException {
+    public void exit() throws IOException {
         clientSocket.close();
         out.close();
         in.close();
@@ -63,6 +63,6 @@ public class Client {
         Client client = new Client();
         client.start("127.0.0.1", 8000);
         client.run();
-        client.stop();
+        client.exit();
     }
 }
