@@ -1,14 +1,21 @@
 package com.dnellessen;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+
 import java.net.*;
 import java.io.*;
 
 public class Server {
     private ServerSocket serverSocket;
-    public int clientsCount;
-    public boolean isRunning = false;
+
+    int clientsCount;
+    ArrayList<String> clientUsernames = new ArrayList<>();
+    ArrayList<Socket> clientSockets = new ArrayList<>();
+    HashMap<String, PrintWriter> clientOuts = new HashMap<>();
 
     public class ServerHandler extends Thread {
+        String clientUsername;
         private Socket clientSocket;
         private PrintWriter out;
         private BufferedReader in;
@@ -22,59 +29,101 @@ public class Server {
             try {
                 out = new PrintWriter(clientSocket.getOutputStream(), true);
                 in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-    
-                String clientMessage;
-                String serverResponse;
-        
-                while (true) {
-                    clientMessage = in.readLine();
-                    System.out.println("[Server] Recieved message :: " + clientMessage);
-        
-                    if (clientMessage.equals("exit")) {
-                        System.out.println("[Server] User disconnected");
-                        clientsCount--;
-                        System.out.println("[Server] " + clientsCount + " connected user(s)");
+
+                clientUsername = in.readLine();
+                
+                System.out.println(clientUsername + " connected");
+                if (clientsCount == 1) {
+                    System.out.println(clientsCount + " connected user");
+                } else {
+                    System.out.println(clientsCount + " connected users");
+                }
+
+                clientUsernames.add(clientUsername);
+                clientSockets.add(clientSocket);
+                clientOuts.put(clientUsername, out);
+
+                String clientMsg = "";
+                String serverMsg;
+
+                while (clientSocket.isConnected()) {
+                    clientMsg = in.readLine();
+
+                    if (clientMsg.equals("exit") || clientMsg.equals("server.close")) {
                         break;
                     }
-                    
-                    serverResponse = "You said '" + clientMessage + "'";
-                    out.println(serverResponse);
-                    System.out.println("[Server] Sent message :: " + serverResponse);
+
+                    serverMsg = clientUsername + ": " + clientMsg;
+
+                    for (int index = 0; index < clientUsernames.size(); index++) {
+                        String username = clientUsernames.get(index);
+                        if (!username.equals(clientUsername)) {
+                            clientOuts.get(username).println(serverMsg);
+                        }
+                    }
                 }
+                if (clientMsg.equals("server.close")) exit();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            disconnect(clientUsername, clientSocket);
+            close();
+        }
+        
+        void disconnect(String clientUsername, Socket clientSocket) {
+            System.out.println(clientUsername + " disconnected");
+            clientUsernames.remove(clientUsername);
+            clientSockets.remove(clientSocket);
+            clientOuts.remove(clientUsername);
+            clientsCount--;
+            if (clientsCount == 1) {
+                System.out.println(clientsCount + " connected user");
+            } else {
+                System.out.println(clientsCount + " connected users");
+            }
+        }
+
+        void close() {
+            try {
                 clientSocket.close();
                 out.close();
                 in.close();
-                if (clientsCount == 0) exit();
             } catch (IOException e) {
-                e.printStackTrace();
+                exit();
             }
         }
     }
 
     public void start(int port) throws IOException {
+        System.out.println("………………………………………… SERVER …………………………………………");
         serverSocket = new ServerSocket(port);
-        System.out.println("[Server] Created socket on port :: " + port);
-        isRunning = true;
+        System.out.println("Listening on port " + port);
 
-        System.out.println("[Server] Listening for connections...");
-        while (true) {
-            try { new ServerHandler(serverSocket.accept()).start(); }
-            catch (SocketException e) { break; }
-            
-            System.out.println("[Server] Connection accepted");
+        while (!serverSocket.isClosed()) {
+            try {
+                new ServerHandler(serverSocket.accept()).start();
+            } catch (SocketException e) {
+                exit();
+            }
+
             clientsCount++;
-            System.out.println("[Server] " + clientsCount + " connected user(s)");
         }
     }
-    
-    public void exit() throws IOException {
-        serverSocket.close();
-        isRunning = false;
-        System.out.println("[Server] Stopped");
+
+    public void exit() {
+        try {
+            for (Socket socket : clientSockets) {
+                socket.close();
+            }
+            serverSocket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public static void main(String[] args) throws IOException {
         Server server = new Server();
         server.start(8000);
+        server.exit();
     }
 }
