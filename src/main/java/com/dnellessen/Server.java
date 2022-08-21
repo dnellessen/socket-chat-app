@@ -1,26 +1,28 @@
 package com.dnellessen;
 
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
 
-import java.net.*;
-import java.io.*;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketException;
+
+import java.util.ArrayList;
 
 public class Server {
     private ServerSocket serverSocket;
+    ArrayList<ClientHandler> clientHandlers = new ArrayList<>();
 
-    int clientsCount;
-    ArrayList<String> clientUsernames = new ArrayList<>();
-    ArrayList<Socket> clientSockets = new ArrayList<>();
-    HashMap<String, PrintWriter> clientOuts = new HashMap<>();
 
-    public class ServerHandler extends Thread {
+    public class ClientHandler extends Thread {
         String clientUsername;
         private Socket clientSocket;
         private PrintWriter out;
         private BufferedReader in;
 
-        ServerHandler(Socket clientSocket) {
+        ClientHandler(Socket clientSocket) {
             this.clientSocket = clientSocket;
         }
 
@@ -29,101 +31,106 @@ public class Server {
             try {
                 out = new PrintWriter(clientSocket.getOutputStream(), true);
                 in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-
+    
                 clientUsername = in.readLine();
-                
                 System.out.println(clientUsername + " connected");
-                if (clientsCount == 1) {
-                    System.out.println(clientsCount + " connected user");
-                } else {
-                    System.out.println(clientsCount + " connected users");
-                }
-
-                clientUsernames.add(clientUsername);
-                clientSockets.add(clientSocket);
-                clientOuts.put(clientUsername, out);
-
-                String clientMsg = "";
-                String serverMsg;
-
+                transmitMessage("[Server] " + clientUsername + " connected");
+                printNumOfClients();
+    
+                String clientMsg, serverMsg;
                 while (clientSocket.isConnected()) {
                     clientMsg = in.readLine();
-
-                    if (clientMsg.equals("exit") || clientMsg.equals("server.close")) {
+    
+                    if (clientMsg.equals("!exit")) {
                         break;
                     }
-
+    
                     serverMsg = clientUsername + ": " + clientMsg;
-
-                    for (int index = 0; index < clientUsernames.size(); index++) {
-                        String username = clientUsernames.get(index);
-                        if (!username.equals(clientUsername)) {
-                            clientOuts.get(username).println(serverMsg);
-                        }
-                    }
+                    transmitMessage(serverMsg);
                 }
-                if (clientMsg.equals("server.close")) exit();
             } catch (IOException e) {
-                e.printStackTrace();
+                exit();
             }
-            disconnect(clientUsername, clientSocket);
+
             close();
         }
-        
-        void disconnect(String clientUsername, Socket clientSocket) {
-            System.out.println(clientUsername + " disconnected");
-            clientUsernames.remove(clientUsername);
-            clientSockets.remove(clientSocket);
-            clientOuts.remove(clientUsername);
-            clientsCount--;
-            if (clientsCount == 1) {
-                System.out.println(clientsCount + " connected user");
-            } else {
-                System.out.println(clientsCount + " connected users");
+
+        private void transmitMessage(String msg) {
+            for (ClientHandler clientHandler : clientHandlers) {
+                if (clientHandler != this) {
+                    clientHandler.out.println(msg);
+                }
             }
+        }
+
+        private int printNumOfClients() {
+            int numOfClients = clientHandlers.size();
+            if (numOfClients == 1) {
+                System.out.println(numOfClients + " connected user");
+            } else {
+                System.out.println(numOfClients + " connected users");
+            }
+
+            return numOfClients;
         }
 
         void close() {
+            clientHandlers.remove(this);
+            System.out.println(clientUsername + " disconnected");
+            transmitMessage("[Server] " + clientUsername + " disconnected");
+            int numOfClients = printNumOfClients();
+
             try {
                 clientSocket.close();
                 out.close();
                 in.close();
             } catch (IOException e) {
+                e.printStackTrace();
+            }
+            
+            if (numOfClients == 0) {
                 exit();
             }
+            
         }
     }
 
+
     public void start(int port) throws IOException {
-        System.out.println("………………………………………… SERVER …………………………………………");
         serverSocket = new ServerSocket(port);
         System.out.println("Listening on port " + port);
 
         while (!serverSocket.isClosed()) {
+            ClientHandler clientHandler;
             try {
-                new ServerHandler(serverSocket.accept()).start();
+                clientHandler = new ClientHandler(serverSocket.accept());
+                clientHandlers.add(clientHandler);
+                clientHandler.start();
             } catch (SocketException e) {
                 exit();
             }
-
-            clientsCount++;
         }
     }
 
     public void exit() {
+        if (serverSocket.isClosed())
+            return;
+            
         try {
-            for (Socket socket : clientSockets) {
-                socket.close();
+            for (ClientHandler clientHandler : clientHandlers) {
+                clientHandler.close();
             }
             serverSocket.close();
+            System.out.println("Server closed.");
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
+
     public static void main(String[] args) throws IOException {
+        System.out.println("………………………………………… SERVER …………………………………………");
         Server server = new Server();
         server.start(8000);
-        server.exit();
     }
 }

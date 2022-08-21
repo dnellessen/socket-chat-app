@@ -1,50 +1,29 @@
 package com.dnellessen;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+
+import java.net.Socket;
+
 import java.util.Scanner;
 
-import java.net.*;
-import java.io.*;
-
 public class Client {
-    public String username;
-
+    String username;
     private Socket clientSocket;
     private PrintWriter out;
     private BufferedReader in;
-
-    public void start(String host, int port) throws IOException {
-        clientSocket = new Socket(host, port);
-        out = new PrintWriter(clientSocket.getOutputStream(), true);
-        in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+    
+    
+    public void transmitMessage(String msg) {
+        out.println(msg);
     }
     
-    public void sendMessage(String message) throws IOException {
-        out.println(message);
-    }
-    
-    public String readMessage() throws IOException {
+    public String recieveMessage() throws IOException {
         return in.readLine();
     }
-
-    public void run() throws IOException {
-        System.out.println("………………………………………… USER …………………………………………");
-        Scanner userInput = new Scanner(System.in);
-        System.out.print("Username  ");
-        username = userInput.nextLine();
-        out.println(username);
-
-        recieveMessages();
-        
-        String msg;
-        while (clientSocket.isConnected()) {
-            msg = userInput.nextLine();
-            sendMessage(msg);
-            if (msg.equals("exit")) break;
-        }
-
-        userInput.close();
-    }
-
+    
     public void recieveMessages() {
         new Thread(new Runnable() {
             @Override
@@ -52,27 +31,65 @@ public class Client {
                 while (true) {
                     try {
                         while (!in.ready());
-                        String msg = readMessage();
+                        String msg = recieveMessage();
                         System.out.println(msg);
                     } catch (IOException e) {
                         break;
                     }
                 }
+                exit();
             }
 
         }).start();
     }
-    
-    public void exit() throws IOException {
-        clientSocket.close();
-        out.close();
-        in.close();
+ 
+    private void setUsername(Scanner userInput) {
+        System.out.print("Username  ");
+        username = userInput.nextLine();
+        out.println(username);
+        System.out.println();
+    }
+
+
+    public void start(String host, int port) throws IOException {        
+        clientSocket = new Socket(host, port);
+        out = new PrintWriter(clientSocket.getOutputStream(), true);
+        in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+    }
+
+    public void run() {
+        Scanner userInput = new Scanner(System.in);
+
+        setUsername(userInput);
+        recieveMessages();
+        
+        String msg;
+        while (clientSocket.isConnected()) {
+            msg = userInput.nextLine();
+            transmitMessage(msg);
+            if (msg.equals("!exit")) 
+                break;
+        }
+
+        userInput.close();
+        exit();
     }
     
+    public void exit(){
+        try {
+            clientSocket.close();
+            out.close();
+            in.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    
+
     public static void main(String[] args) throws IOException {
+        System.out.println("………………………………………… USER …………………………………………");
         Client client = new Client();
         client.start("127.0.0.1", 8000);
         client.run();
-        client.exit();
     }
 }
